@@ -1,6 +1,5 @@
 require 'pathname'
 require 'fileutils'
-require 'active_support'
 
 module FileSystemAuth
   PermissionOptions = Struct.new(:chmod_octal, :user, :group) do
@@ -26,29 +25,35 @@ module FileSystemAuth
   end
 
   module Entity
-    extend ActiveSupport::Concern
+    class << self
+      def included(klass)
+        klass.class_eval do
+          attr_reader :pathname
+        end
 
-    class_methods do
-      def register_filesystem_permission_class(
-        class_name,
-        chmod_octal: nil,
-        user: nil,
-        group: nil
-      )
-        (@permission_classes ||= {})[class_name.to_sym] = PermissionOptions.new(
-          chmod_octal,
-          user,
-          group
-        )
+        klass.singleton_class.class_eval do
+          def register_filesystem_permission_class(
+            class_name,
+            chmod_octal: nil,
+            user: nil,
+            group: nil
+          )
+            (@permission_classes ||= {})[class_name.to_sym] = PermissionOptions.new(
+              chmod_octal,
+              user,
+              group
+            )
+          end
+
+          def filesystem_permission_classes
+            @permission_classes || {}
+          end
+
+          def unregister_all_filesystem_permission_classes
+            @permission_classes&.clear
+          end
+        end
       end
-
-      def filesystem_permission_classes
-        @permission_classes || {}
-      end
-    end
-
-    included do
-      attr_reader :pathname
     end
 
     # instance methods
@@ -128,27 +133,5 @@ module FileSystemAuth
 
       apply_permissions!
     end
-  end
-end
-
-FileSystemAuth::Dir.register_filesystem_permission_class(:class1, chmod_octal: 06770)
-FileSystemAuth::Dir.register_filesystem_permission_class(:class2, chmod_octal: 06750, group: (proc do 'ruby' end))
-FileSystemAuth::File.register_filesystem_permission_class(:class1, chmod_octal: 00640, group: 'ruby')
-foo = FileSystemAuth::Dir.new('/home/jcarson/tmp', permission_class: :class1)
-
-foo
-.join('foo', type: :dir, permission_class: :class1)
-.create!
-
-foo
-.join('bar', type: :dir, permission_class: :class2)
-.join('bar1', type: :dir, permission_class: :class2)
-.join('bar2', type: :dir, permission_class: :class2)
-.join('bar3', type: :dir, permission_class: :class2)
-.join('bar4', type: :dir, permission_class: :class2)
-.join('bar.txt', type: :file, permission_class: :class1)
-.prepare do |pathname|
-  File.open(pathname, 'w') do |f|
-    f.puts 'Hello, World!'
   end
 end

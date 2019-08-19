@@ -31,28 +31,30 @@ module FileSystemAuth
           attr_reader :pathname
         end
 
-        klass.singleton_class.class_eval do
-          def register_filesystem_permission_class(
-            class_name,
-            chmod_octal: nil,
-            user: nil,
-            group: nil
-          )
-            (@permission_classes ||= {})[class_name.to_sym] = PermissionOptions.new(
-              chmod_octal,
-              user,
-              group
-            )
-          end
+        klass.extend(ClassMethods)
+      end
+    end
 
-          def filesystem_permission_classes
-            @permission_classes || {}
-          end
+    module ClassMethods
+      def register_filesystem_permission_class(
+        class_name,
+        chmod_octal: nil,
+        user: nil,
+        group: nil
+      )
+        (@permission_classes ||= {})[class_name.to_sym] = PermissionOptions.new(
+          chmod_octal,
+          user,
+          group
+        )
+      end
 
-          def unregister_all_filesystem_permission_classes
-            @permission_classes&.clear
-          end
-        end
+      def filesystem_permission_classes
+        @permission_classes || {}
+      end
+
+      def unregister_all_filesystem_permission_classes
+        @permission_classes&.clear
       end
     end
 

@@ -71,7 +71,11 @@ module FileSystemAuth
 
     # anything these objects can't respond to send to the pathname object
     def method_missing(method_name, *args, &block)
-      pathname.send(method_name, *args, &block)
+      if pathname.respond_to?(method_name)
+        pathname.send(method_name, *args, &block)
+      else
+        super
+      end
     end
 
     def respond_to_missing?(method_name, include_private = false)
@@ -127,6 +131,10 @@ module FileSystemAuth
       FileUtils.mkdir(pathname)
 
       apply_permissions!
+    end
+
+    def delete
+      FileUtils.rm_rf(pathname)
     end
   end
 

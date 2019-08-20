@@ -66,11 +66,16 @@ module FileSystemAuth
     end
 
     def to_s
-      "<#{self.class.name} path=#{pathname.to_s} permissions=#{permission_options.to_s}>"
+      pathname.to_s
     end
 
-    def exist?
-      pathname.exist?
+    # anything these objects can't respond to send to the pathname object
+    def method_missing(method_name, *args, &block)
+      pathname.send(method_name, *args, &block)
+    end
+
+    def respond_to_missing?(method_name, include_private = false)
+      pathname.respond_to?(method_name, include_private)
     end
 
     private
@@ -127,6 +132,10 @@ module FileSystemAuth
 
   class File
     include FileSystemAuth::Entity
+
+    def basename_without_extname
+      pathname.basename('.*')
+    end
 
     def prepare
       @parent.create!

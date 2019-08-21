@@ -25,6 +25,12 @@ module FileSystemAuth
   end
 
   module Entity
+    PROXY_METHOD_OPTIONS = {
+      relative_path_from: {
+        entity_to_pathname_args: [0]
+      }
+    }
+
     class << self
       def included(klass)
         klass.class_eval do
@@ -72,6 +78,14 @@ module FileSystemAuth
     # anything these objects can't respond to send to the pathname object
     def method_missing(method_name, *args, &block)
       if pathname.respond_to?(method_name)
+        if PROXY_METHOD_OPTIONS.key?(method_name)
+          PROXY_METHOD_OPTIONS.dig(method_name, :entity_to_pathname_args).each do |arg_number|
+            if args[arg_number].class.include?(FileSystemAuth::Entity)
+              args[arg_number] = args[arg_number].pathname
+            end
+          end
+        end
+
         pathname.send(method_name, *args, &block)
       else
         super

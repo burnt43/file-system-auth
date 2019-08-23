@@ -155,4 +155,108 @@ class FileSystemAuth::Testing::FileSystemAuthTest < FileSystemAuth::Testing::Tes
     assert_equal('foo/bar', dir0002.relative_path_from(top_level).to_s)
     assert_equal('foo/bar', dir0002.relative_path_from(top_level.pathname).to_s)
   end
+
+  def test_apply_permissions_bubble_up_feature
+    FileSystemAuth::Dir.register_filesystem_permission_class(
+      :class1,
+      chmod_octal: 0o0700,
+      group: 'ghost'
+    )
+    FileSystemAuth::Dir.register_filesystem_permission_class(
+      :class2,
+      chmod_octal: 0o0740,
+      group: 'ghost'
+    )
+
+    FileSystemAuth::File.register_filesystem_permission_class(
+      :class3,
+      chmod_octal: 0o766,
+      group: 'ghost'
+    )
+
+    # manually create some directories and files
+    file_pathname = @scratch_area.join('dir1', 'dir1-1', 'dir1-1-1', 'file.txt')
+    FileUtils.mkdir_p(file_pathname.parent)
+    File.open(file_pathname, 'w') do |f|
+      f.puts 'foobar'
+    end
+
+    # the flags should be default
+    props = entity_props(@scratch_area.join('dir1'))
+    assert_equal('drwxr-xr-x', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1'))
+    assert_equal('drwxr-xr-x', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1', 'dir1-1-1'))
+    assert_equal('drwxr-xr-x', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1', 'dir1-1-1', 'file.txt'))
+    assert_equal('-rw-r--r--', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    # create file_system_auth representation of what was manually created
+    top_level = FileSystemAuth::Dir.new(@scratch_area, permission_class: :system)
+    file_auth_pathname =
+      top_level
+      .join('dir1', type: :dir, permission_class: :class1)
+      .join('dir1-1', type: :dir, permission_class: :class2)
+      .join('dir1-1-1', type: :dir, permission_class: :class1)
+      .join('file.txt', type: :file, permission_class: :class3)
+
+    # apply_permissions! to the leaf node without bubbling up
+    file_auth_pathname.apply_permissions!(bubble_up: false)
+
+    # the flags should have only changed for the file
+    props = entity_props(@scratch_area.join('dir1'))
+    assert_equal('drwxr-xr-x', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1'))
+    assert_equal('drwxr-xr-x', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1', 'dir1-1-1'))
+    assert_equal('drwxr-xr-x', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('jcarson', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1', 'dir1-1-1', 'file.txt'))
+    assert_equal('-rwxrw-rw-', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('ghost', props.group)
+
+    # apply_permissions! with the bubble flag set
+    file_auth_pathname.apply_permissions!(bubble_up: true)
+
+    # now all entities in the tree should have been changed
+    props = entity_props(@scratch_area.join('dir1'))
+    assert_equal('drwx------', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('ghost', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1'))
+    assert_equal('drwxr-----', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('ghost', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1', 'dir1-1-1'))
+    assert_equal('drwx------', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('ghost', props.group)
+
+    props = entity_props(@scratch_area.join('dir1', 'dir1-1', 'dir1-1-1', 'file.txt'))
+    assert_equal('-rwxrw-rw-', props.flags)
+    assert_equal('jcarson', props.user)
+    assert_equal('ghost', props.group)
+  end
 end

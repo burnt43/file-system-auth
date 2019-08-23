@@ -96,9 +96,9 @@ module FileSystemAuth
       pathname.respond_to?(method_name, include_private)
     end
 
-    private
+    def apply_permissions!(bubble_up: false)
+      return unless pathname.exist?
 
-    def apply_permissions!
       po = permission_options
 
       if po.chmod_octal
@@ -108,7 +108,13 @@ module FileSystemAuth
       if po.user || po.group
         FileUtils.chown(po.processed_user, po.processed_group, pathname)
       end
+
+      if bubble_up && has_parent?
+        @parent.apply_permissions!(bubble_up: true)
+      end
     end
+
+    private
 
     def pathname_from_input(input)
       if input.is_a?(String)
@@ -126,6 +132,10 @@ module FileSystemAuth
       else
         PermissionOptions.new(nil, nil, nil)
       end
+    end
+
+    def has_parent?
+      !@parent.nil?
     end
   end
 

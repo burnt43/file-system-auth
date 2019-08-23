@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'file-system-auth'
-  s.version     = '0.0.1'
+  s.version     = '0.0.2'
   s.summary     = 'Helps build complex directory/file trees with different permissions, creating what needs to be created with the correct permissions'
   s.description = 'Simplify File and Directory Permissions'
   s.authors     = ['James Carson']
